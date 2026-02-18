@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.8.0-devel-ubuntu24.04
+FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1
 # ---------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-dev python3-venv \
-    git wget build-essential ninja-build \
+    git wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Use a venv to avoid pip system-packages issues
@@ -23,11 +23,6 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch
-
-# ---------------------------------------------------------------------------
-# Install flash-attn (required by HiDream)
-# ---------------------------------------------------------------------------
-RUN pip install --no-cache-dir -U flash-attn --no-build-isolation
 
 # ---------------------------------------------------------------------------
 # Install diffusers from source (HiDreamImagePipeline needs latest)

@@ -22,11 +22,20 @@ import io
 import os
 
 import torch
+from huggingface_hub import login as hf_login
 from transformers import PreTrainedTokenizerFast, LlamaForCausalLM
 from hi_diffusers import HiDreamImagePipeline, HiDreamImageTransformer2DModel
 from hi_diffusers.schedulers.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
 import runpod
+
+# Authenticate with HuggingFace for gated models (Meta Llama)
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if HF_TOKEN:
+    hf_login(token=HF_TOKEN)
+    print("[hidream] Authenticated with HuggingFace")
+else:
+    print("[hidream] WARNING: No HF_TOKEN found — gated models will fail")
 
 # ---------------------------------------------------------------------------
 # Model loading (runs once on cold start)

@@ -25,7 +25,15 @@ RUN pip install --no-cache-dir \
     torch
 
 # ---------------------------------------------------------------------------
-# Install diffusers from source (HiDreamImagePipeline needs latest)
+# Clone HiDream-I1 repo (contains hi_diffusers package)
+# ---------------------------------------------------------------------------
+RUN git clone --depth=1 https://github.com/HiDream-ai/HiDream-I1.git /opt/hidream
+
+# Make hi_diffusers importable
+ENV PYTHONPATH="/opt/hidream:$PYTHONPATH"
+
+# ---------------------------------------------------------------------------
+# Install diffusers from source (hi_diffusers extends it)
 # ---------------------------------------------------------------------------
 RUN git clone --depth=1 https://github.com/huggingface/diffusers.git /tmp/diffusers \
     && pip install --no-cache-dir /tmp/diffusers \
@@ -39,7 +47,8 @@ RUN pip install --no-cache-dir \
     transformers>=4.47.0 \
     accelerate>=0.34.0 \
     sentencepiece \
-    protobuf
+    protobuf \
+    einops>=0.7.0
 
 # ---------------------------------------------------------------------------
 # Copy handler

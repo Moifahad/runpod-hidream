@@ -23,7 +23,8 @@ import os
 
 import torch
 from transformers import PreTrainedTokenizerFast, LlamaForCausalLM
-from diffusers import HiDreamImagePipeline
+from hi_diffusers import HiDreamImagePipeline, HiDreamImageTransformer2DModel
+from hi_diffusers.schedulers.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
 import runpod
 
@@ -44,22 +45,36 @@ if os.path.exists(CACHE_DIR):
     print(f"[hidream] Using RunPod model cache at {CACHE_DIR}")
 
 print(f"[hidream] Loading Llama tokenizer + text encoder from {LLAMA_ID}...")
-tokenizer_4 = PreTrainedTokenizerFast.from_pretrained(LLAMA_ID)
+tokenizer_4 = PreTrainedTokenizerFast.from_pretrained(LLAMA_ID, use_fast=False)
 text_encoder_4 = LlamaForCausalLM.from_pretrained(
     LLAMA_ID,
     output_hidden_states=True,
     output_attentions=True,
     torch_dtype=DTYPE,
+).to(DEVICE)
+
+print(f"[hidream] Loading HiDream transformer from {MODEL_ID}...")
+transformer = HiDreamImageTransformer2DModel.from_pretrained(
+    MODEL_ID,
+    subfolder="transformer",
+    torch_dtype=DTYPE,
+).to(DEVICE)
+
+print("[hidream] Loading HiDream pipeline...")
+scheduler = FlowUniPCMultistepScheduler(
+    num_train_timesteps=1000,
+    shift=3.0,
+    use_dynamic_shifting=False,
 )
 
-print(f"[hidream] Loading HiDream pipeline from {MODEL_ID}...")
 pipe = HiDreamImagePipeline.from_pretrained(
     MODEL_ID,
+    scheduler=scheduler,
     tokenizer_4=tokenizer_4,
     text_encoder_4=text_encoder_4,
     torch_dtype=DTYPE,
-)
-pipe = pipe.to(DEVICE)
+).to(DEVICE, DTYPE)
+pipe.transformer = transformer
 
 print("[hidream] Model loaded successfully")
 
@@ -79,36 +94,36 @@ def handler(job):
     height = inp.get("height", 1024)
     num_inference_steps = inp.get("num_inference_steps", 50)
     guidance_scale = inp.get("guidance_scale", 5.0)
-    seed = inp.get("seed")
+    seed = inp.get("seed", -1)
 
     # Clamp dimensions
     width = max(512, min(2048, width))
     height = max(512, min(2048, height))
 
     try:
-        generator = None
-        if seed is not None:
-            generator = torch.Generator(DEVICE).manual_seed(seed)
-        else:
-            seed = torch.randint(0, 2**32, (1,)).item()
-            generator = torch.Generator(DEVICE).manual_seed(seed)
+        if seed == -1:
+            seed = torch.randint(0, 1000000, (1,)).item()
+        generator = torch.Generator(DEVICE).manual_seed(seed)
 
-        result = pipe(
+        print(f"[hidream] Generating {width}x{height}, steps={num_inference_steps}, cfg={guidance_scale}, seed={seed}")
+        print(f"[hidream] Prompt: \"{prompt[:100]}...\"")
+
+        image = pipe(
             prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt else None,
             height=height,
             width=width,
             guidance_scale=guidance_scale,
             num_inference_steps=num_inference_steps,
+            num_images_per_prompt=1,
             generator=generator,
-        )
-
-        image = result.images[0]
+        ).images[0]
 
         # Encode to PNG base64
         buf = io.BytesIO()
         image.save(buf, format="PNG")
         image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+        print(f"[hidream] Generated {len(buf.getvalue()) / 1024:.1f}KB PNG")
 
         return {
             "image": image_b64,

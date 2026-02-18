@@ -45,7 +45,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DTYPE = torch.bfloat16
 
 MODEL_ID = "HiDream-ai/HiDream-I1-Full"
-LLAMA_ID = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+LLAMA_ID = "unsloth/Meta-Llama-3.1-8B-Instruct"
 
 # Check RunPod model cache
 CACHE_DIR = "/runpod-volume/huggingface-cache/hub"
